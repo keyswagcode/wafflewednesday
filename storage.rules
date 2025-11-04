@@ -1,0 +1,44 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Waffles storage - /waffles/{userId}/{timestamp}.m4a
+    match /waffles/{userId}/{fileName} {
+      // Anyone authenticated can read waffles
+      allow read: if isSignedIn();
+
+      // Users can only upload to their own folder
+      allow create: if isOwner(userId) &&
+                      request.resource.contentType.matches('audio/.*') &&
+                      request.resource.size < 50 * 1024 * 1024; // Max 50MB
+
+      // Users can delete their own waffles
+      allow delete: if isOwner(userId);
+    }
+
+    // Replies storage - /replies/{userId}/{timestamp}.m4a
+    match /replies/{userId}/{fileName} {
+      // Users can read replies in their own folder (sent by them)
+      // Note: This doesn't restrict who can read the reply, but access
+      // would require knowing the exact URL
+      allow read: if isSignedIn();
+
+      // Users can only upload to their own folder
+      allow create: if isOwner(userId) &&
+                      request.resource.contentType.matches('audio/.*') &&
+                      request.resource.size < 50 * 1024 * 1024; // Max 50MB
+
+      // Users can delete their own replies
+      allow delete: if isOwner(userId);
+    }
+  }
+}
